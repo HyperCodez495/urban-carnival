@@ -1,0 +1,64 @@
+name: Build Android APKs
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4.7.0
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3.2.2
+
+      - name: Install SDK components
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Generate debug keystore
+        run: |
+          keytool -genkeypair \
+            -keystore $HOME/debug.keystore \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Build Mobile APK
+        working-directory: android
+        run: gradle assembleMobileDebug --no-daemon --stacktrace
+
+      - name: Build TV APK
+        working-directory: android
+        run: gradle assembleTvDebug --no-daemon --stacktrace
+
+      - name: Upload Mobile APK
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: VortX-mobile-apk
+          path: android/app/build/outputs/apk/mobile/debug/app-mobile-debug.apk
+          retention-days: 30
+
+      - name: Upload TV APK
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: VortX-tv-apk
+          path: android/app/build/outputs/apk/tv/debug/app-tv-debug.apk
+          retention-days: 30
